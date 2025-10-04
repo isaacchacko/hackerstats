@@ -7,7 +7,6 @@ import urllib.parse
 import sys
 import os
 
-CHROMIUM_PATH = "/usr/bin/chromium"  # Edit as needed
 NULL_CMD = -1
 NO_TASK = -2
 NO_FROM = {'name': 'Unknown', 'folder': 'Unknown'}
@@ -16,7 +15,6 @@ TIMEOUT = 0.1
 options = Options()
 options.add_argument("--headless")
 options.add_argument("--disable-gpu")
-options.binary_location = CHROMIUM_PATH
 
 logError = lambda msg: print(msg, file=sys.stderr)
 def get_filepath(task): return f'./{task['folder']}/{task['name']}.html'
