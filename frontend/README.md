@@ -1,36 +1,118 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HackerStats Frontend
 
-## Getting Started
+A Next.js web application for visualizing Neo4j graph data and managing vectorizer operations.
 
-First, run the development server:
+## Features
 
+- **Interactive Graph Visualization**: D3.js-powered visualization of Neo4j graph data
+- **Neo4j Integration**: Direct connection to Neo4j database via API routes
+- **Vectorizer Management**: Tools for running scale tests and vector repair operations
+- **Custom Query Interface**: Execute Cypher queries directly from the web interface
+- **Real-time Statistics**: Live updates of graph statistics and node counts
+
+## Setup
+
+### Prerequisites
+
+- Node.js 18+ 
+- Neo4j database running locally or remotely
+- Python backend with vectorizer tools
+
+### Installation
+
+1. Install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Create environment file:
+```bash
+cp .env.local.example .env.local
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Configure environment variables in `.env.local`:
+```
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=your_password
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Start the development server:
+```bash
+npm run dev
+```
 
-## Learn More
+## API Endpoints
 
-To learn more about Next.js, take a look at the following resources:
+### Graph API (`/api/graph`)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **GET**: Fetch graph data with optional filtering
+  - `?nodeType=all|hackers|devposts` - Filter by node type
+  - `?limit=100` - Limit number of nodes returned
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **POST**: Execute custom Cypher queries
+  - Body: `{ "query": "MATCH (n) RETURN n LIMIT 10" }`
 
-## Deploy on Vercel
+### Vectorizer API (`/api/vectorizer`)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **GET**: Check system status and list available projects
+  - `?action=status` - Check vectorizer status
+  - `?action=list_projects` - List available projects
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **POST**: Execute vectorizer operations
+  - `{ "action": "scale_test" }` - Run full scale test
+  - `{ "action": "repair_vectors" }` - Repair existing vectors
+  - `{ "action": "vectorize_project", "projectId": "project-name" }` - Vectorize specific project
+  - `{ "action": "similarity_search", "query": "your query" }` - Search for similar projects
+
+## Components
+
+### GraphVisualization
+
+Interactive D3.js graph component with:
+- Force-directed layout
+- Zoom and pan controls
+- Node and link selection
+- Real-time position updates
+- Custom styling for different node types
+
+### VectorizerRepair
+
+Management interface for:
+- System status monitoring
+- Scale test execution
+- Vector repair operations
+- Project-specific vectorization
+- Similarity search functionality
+
+## Usage
+
+1. **View Graph Data**: The main page loads and displays the Neo4j graph with interactive controls
+2. **Filter Data**: Use the node type dropdown to filter between all nodes, hackers only, or projects only
+3. **Execute Queries**: Use the custom query interface to run Cypher queries
+4. **Manage Vectors**: Use the vectorizer repair section to run scale tests and repair operations
+5. **Search Similarity**: Use the similarity search to find projects similar to your query
+
+## Development
+
+The application uses:
+- **Next.js 15** with App Router
+- **TypeScript** for type safety
+- **Tailwind CSS** for styling
+- **D3.js** for graph visualization
+- **Neo4j Driver** for database connectivity
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Neo4j Connection Failed**: Check that Neo4j is running and credentials are correct
+2. **Vectorizer Operations Fail**: Ensure Python backend is properly configured
+3. **Graph Not Loading**: Check browser console for errors and verify API endpoints
+
+### Debug Mode
+
+Enable debug logging by adding to `.env.local`:
+```
+NEXT_PUBLIC_DEBUG=true
+```

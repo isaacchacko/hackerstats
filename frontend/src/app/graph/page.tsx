@@ -18,13 +18,14 @@ export default function GraphPage() {
   const [nodeType, setNodeType] = useState<string>('all');
   const [limit, setLimit] = useState<number>(100);
   const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [search, setSearch] = useState<string>("");
 
   const fetchGraphData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/graph?nodeType=${nodeType}&limit=${limit}`);
+      const response = await fetch(`/api/graph?limit=${limit}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -73,12 +74,8 @@ export default function GraphPage() {
           </motion.a>
 
           <div className="flex space-x-6">
-            <a href="/" className="text-slate-300 hover:text-blue-400 transition-colors duration-300 hover:-translate-y-0.5">
-              Home
-            </a>
-            <a href="/vectorizer" className="text-slate-300 hover:text-blue-400 transition-colors duration-300 hover:-translate-y-0.5">
-              Vector Tools
-            </a>
+            <a href="/brainstorm" className="text-slate-300 hover:text-blue-400 transition-colors duration-300 hover:-translate-y-0.5">Brainstorm</a>
+            <a href="/graph" className="text-slate-300 hover:text-blue-400 transition-colors duration-300 hover:-translate-y-0.5">Graph</a>
           </div>
         </div>
       </motion.nav>
@@ -104,31 +101,30 @@ export default function GraphPage() {
           <div className="flex flex-wrap gap-6 items-center">
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Node Type
+                Search Nodes
               </label>
-              <select
-                value={nodeType}
-                onChange={(e) => setNodeType(e.target.value)}
-                className="bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 hover:bg-slate-600"
-              >
-                <option value="all">All Nodes</option>
-                <option value="hackers">Hackers Only</option>
-                <option value="devposts">Projects Only</option>
-              </select>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name, label..."
+                className="w-64 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 hover:bg-slate-600"
+              />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Limit
-              </label>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Limit</label>
               <input
-                type="number"
-                value={limit}
-                onChange={(e) => setLimit(Math.max(1, Math.floor(parseInt(e.target.value) || 100)))}
-                min="1"
-                max="1000"
-                step="1"
-                className="bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 hover:bg-slate-600"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={String(limit)}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, '');
+                  const num = digits ? parseInt(digits, 10) : 0;
+                  setLimit(num);
+                }}
+                className="w-24 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 hover:bg-slate-600"
               />
             </div>
 
@@ -172,69 +168,10 @@ export default function GraphPage() {
           )}
         </motion.div>
 
-        {/* Graph Visualization with Right Panel */}
-        <motion.div
-          className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-        >
-          <h2 className="text-2xl font-bold text-white mb-6">
-            Interactive Graph
-          </h2>
-
-          <div className="flex gap-6">
-            {/* Graph Area */}
-            <div className="flex-1">
-              <GraphVisualization
-                data={graphData}
-                onNodeClick={handleNodeClick}
-                onLinkClick={handleLinkClick}
-              />
-            </div>
-
-            {/* Right Panel for Selected Node */}
-            {selectedNode && (
-              <motion.div
-                className="w-80 bg-slate-700/50 backdrop-blur-sm border border-slate-600/50 rounded-xl p-6"
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold text-white">Node Details</h3>
-                  <button
-                    onClick={() => setSelectedNode(null)}
-                    className="text-slate-400 hover:text-white transition-colors"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-lg font-semibold text-blue-300 mb-2">
-                      {selectedNode.label}
-                    </h4>
-                    <div className="text-sm text-slate-300 space-y-1">
-                      <p><span className="font-medium">ID:</span> {selectedNode.id}</p>
-                      {Object.entries(selectedNode.properties).map(([key, value]) => (
-                        <p key={key}>
-                          <span className="font-medium">{key}:</span> {String(value)}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </div>
-        </motion.div>
-
         {/* Statistics */}
         {graphData && (
           <motion.div
-            className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6"
+            className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.6 }}
@@ -262,6 +199,116 @@ export default function GraphPage() {
             </div>
           </motion.div>
         )}
+
+        {/* Graph Visualization with Right Panel */}
+        <motion.div
+          className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+        >
+          <h2 className="text-2xl font-bold text-white mb-6">
+            Interactive Graph
+          </h2>
+
+          <div className="flex gap-6">
+            {/* Graph Area */}
+            <div className="flex-1">
+              <GraphVisualization
+                data={graphData}
+                onNodeClick={handleNodeClick}
+                onLinkClick={handleLinkClick}
+                highlightQuery={search}
+              />
+            </div>
+
+            {/* Right Panel for Selected Node */}
+            {selectedNode && (
+              <motion.div
+                className="w-80 bg-slate-700/50 backdrop-blur-sm border border-slate-600/50 rounded-xl p-6"
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-bold text-white">Node Details</h3>
+                  <button
+                    onClick={() => setSelectedNode(null)}
+                    className="text-slate-400 hover:text-white transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-5">
+                  <div>
+                    <h4 className="text-lg font-semibold text-blue-300 mb-1">
+                      {selectedNode.label}
+                    </h4>
+                    <div className="text-xs text-slate-400 mb-2">ID: {selectedNode.id}</div>
+                    <div className="text-sm text-slate-300 space-y-1 break-words">
+                      {Object.entries(selectedNode.properties).map(([key, value]) => (
+                        <p key={key}>
+                          <span className="font-medium">{key}:</span> {String(value)}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* External Links */}
+                  <div>
+                    <h5 className="text-sm font-semibold text-slate-200 mb-2">External</h5>
+                    <ul className="list-disc list-inside space-y-1 text-sm">
+                      {selectedNode.label === 'Hacker' && (
+                        <>
+                          {/* Devpost profile by username (properties.name) */}
+                          {selectedNode.properties?.name && (
+                            <li>
+                              <a
+                                className="text-blue-400 hover:underline"
+                                href={`https://devpost.com/${selectedNode.properties.name}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Devpost: devpost.com/{selectedNode.properties.name}
+                              </a>
+                            </li>
+                          )}
+                          {/* Social URLs */}
+                          {Array.isArray(selectedNode.properties?.socialURLs) && selectedNode.properties.socialURLs.length > 0 && (
+                            selectedNode.properties.socialURLs.map((url: string, idx: number) => (
+                              <li key={idx}>
+                                <a className="text-blue-400 hover:underline" href={url} target="_blank" rel="noreferrer">{url}</a>
+                              </li>
+                            ))
+                          )}
+                        </>
+                      )}
+
+                      {selectedNode.label === 'Devpost' && (
+                        <>
+                          {selectedNode.properties?.name && (
+                            <li>
+                              <a
+                                className="text-blue-400 hover:underline"
+                                href={`https://devpost.com/software/${selectedNode.properties.name}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Devpost: devpost.com/software/{selectedNode.properties.name}
+                              </a>
+                            </li>
+                          )}
+                        </>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </motion.div>
+
       </div>
     </div>
   );

@@ -305,7 +305,7 @@ if __name__ == "__main__":
     username = os.getenv("NEO4J_USERNAME")
     password = os.getenv("NEO4J_PASSWORD")
 
-    driver = GraphDatabase.driver(uri, auth=(username, password))
+    driver = GraphDatabase.driver(uri, auth=(username, password), encrypted=True)
     
     q_todo = Queue()
     q_hacker = Queue()

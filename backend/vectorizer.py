@@ -209,14 +209,30 @@ class DevpostVectorizer:
         return np.array([target_users.get(cat, 0.0) for cat in categories])
 
     def create_award_embedding(self, awards: List[str]) -> np.ndarray:
-        """Create embedding for awards."""
+        """Create a fixed-size embedding for awards using a hashing trick.
+
+        We avoid per-document TF-IDF vocab (which yields variable-length vectors)
+        and instead map tokens into a fixed-length bucketed vector.
+        """
+        HASH_DIM = 64
+        vec = np.zeros(HASH_DIM, dtype=float)
         if not awards:
-            return np.zeros(10)  # Fixed size for no awards
-        
-        # Create TF-IDF embedding for awards
-        award_text = ' '.join(awards)
-        tfidf_matrix = self.tfidf_vectorizer.fit_transform([award_text])
-        return tfidf_matrix.toarray()[0]
+            return vec
+
+        text = ' '.join(awards).lower()
+        # Simple tokenization on non-alphanumerics
+        tokens = re.split(r"[^a-z0-9_+-]+", text)
+        for tok in tokens:
+            if not tok:
+                continue
+            h = hash(tok)  # Python's hash is fine for a bucket index here
+            idx = h % HASH_DIM
+            vec[idx] += 1.0
+        # L2 normalize for scale invariance
+        norm = np.linalg.norm(vec)
+        if norm > 0:
+            vec = vec / norm
+        return vec
 
     def create_team_embedding(self, team_size: int, team_names: List[str]) -> np.ndarray:
         """Create embedding for team characteristics."""

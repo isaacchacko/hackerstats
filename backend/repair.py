@@ -39,9 +39,9 @@ def get_all_devposts():
     return devposts
 
 def create_browser():
-    """Create a new browser instance for thread-safe scraping"""
+    """Create a new browser instance (Google Chrome) for thread-safe scraping"""
     options = Options()
-    options.binary_location ="/usr/bin/google-chrome"
+    options.binary_location = '/usr/bin/chromium'
     options.add_argument("--headless")
     return SeleniumChrome(options=options)
 
@@ -289,4 +289,4 @@ def main():
         
 
 if __name__ == '__main__':
-    main()
+    print(scrape_devpost_with_browser('player5'))

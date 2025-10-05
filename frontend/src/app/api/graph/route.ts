@@ -20,110 +20,83 @@ const driver = neo4j.driver(
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const limitParam = searchParams.get('limit') || 100;
-    // const limit = Math.max(1, Math.floor(parseInt(limitParam, 10) || 100));
-    const nodeType = searchParams.get('nodeType') || 'all';
+    const limitParam = searchParams.get('limit') || '500';
+    const nameParam = searchParams.get('name') || 'isaacchacko';
+    const connectionsParam = searchParams.get('connections') || searchParams.get('depth') || '100';
+
+    // Sanitize parameters
+    const limit = Math.max(1, Math.floor(parseInt(limitParam, 10) || 500));
+    // Allow large exploration but guard against unbounded values
+    const depth = Math.min(100, Math.max(1, Math.floor(parseInt(connectionsParam, 10) || 2)));
 
     const session = driver.session();
 
     try {
-      let query: string;
-      let params: any = { limit: limitParam };
+      // Build a query that starts from a specific Hacker by name and explores up to `depth` hops.
+      // We limit on DISTINCT nodes (not paths) to maximize unique nodes while keeping the subgraph connected from the start node.
+      // Note: variable-length upper bounds cannot be parameterized, so we safely inline the validated integer depth
+      const query = `
+        MATCH (h:Hacker {name: $name})
+        MATCH p=(h)-[*..${depth}]-(m)
+        WITH p
+        UNWIND nodes(p) AS n
+        WITH DISTINCT n LIMIT TOINTEGER($nodeLimit)
+        WITH collect(n) AS nodes
+        UNWIND nodes AS n
+        MATCH (n)-[r]-(m)
+        WHERE m IN nodes
+        WITH nodes, collect(DISTINCT r) AS rs
+        RETURN nodes AS ns, rs AS rs
+      `;
 
-      if (nodeType === 'hackers') {
-        query = `
-          MATCH (h:Hacker)
-          OPTIONAL MATCH (h)-[:CONTRIBUTED_TO]->(d:Devpost)
-          RETURN h, collect(d) as devposts
-          LIMIT TOINTEGER($limit)
-        `;
-      } else if (nodeType === 'devposts') {
-        query = `
-          MATCH (d:Devpost)
-          OPTIONAL MATCH (h:Hacker)-[:CONTRIBUTED_TO]->(d)
-          RETURN d, collect(h) as hackers
-          LIMIT TOINTEGER($limit)
-        `;
-      } else {
-        // Get all nodes and relationships
-        query = `
-          MATCH (n)
-          OPTIONAL MATCH (n)-[r]->(m)
-          RETURN n, r, m
-          LIMIT TOINTEGER($limit)
-        `;
-      }
-
+      const params: any = { name: nameParam, nodeLimit: limit };
       const result = await session.run(query, params);
 
-      // Transform the result into a format suitable for D3.js
+      // Transform returned node/relationship arrays into D3-style nodes/links
       const nodes: any[] = [];
       const links: any[] = [];
-      const nodeMap = new Map();
+      const nodeMap = new Map<string, any>();
 
-      result.records.forEach(record => {
-        const node = record.get('n');
-        const relationship = record.get('r');
-        const targetNode = record.get('m');
+      if (result.records.length > 0) {
+        const record = result.records[0];
+        const ns = record.get('ns') || [];
+        const rs = record.get('rs') || [];
 
-        if (node) {
-          const nodeId = node.identity.toString();
-          if (!nodeMap.has(nodeId)) {
-            const nodeData = {
-              id: nodeId,
-              label: node.labels[0],
-              properties: node.properties,
-              x: Math.random() * 800,
-              y: Math.random() * 600
-            };
-            nodes.push(nodeData);
-            nodeMap.set(nodeId, nodeData);
-          }
-        }
+        ns.forEach((neoNode: any) => {
+          const nodeId = neoNode.identity.toString();
+          if (nodeMap.has(nodeId)) return;
+          const nodeData = {
+            id: nodeId,
+            label: neoNode.labels && neoNode.labels.length ? neoNode.labels[0] : 'Node',
+            properties: neoNode.properties,
+            x: Math.random() * 800,
+            y: Math.random() * 600
+          };
+          nodes.push(nodeData);
+          nodeMap.set(nodeId, nodeData);
+        });
 
-        if (relationship && targetNode) {
-          const sourceId = relationship.start.toString();
-          const targetId = relationship.end.toString();
-
-          // Ensure both nodes exist
-          if (!nodeMap.has(sourceId)) {
-            const sourceNode = {
-              id: sourceId,
-              label: 'Unknown',
-              properties: {},
-              x: Math.random() * 800,
-              y: Math.random() * 600
-            };
-            nodes.push(sourceNode);
-            nodeMap.set(sourceId, sourceNode);
-          }
-
-          if (!nodeMap.has(targetId)) {
-            const targetNodeData = {
-              id: targetId,
-              label: 'Unknown',
-              properties: {},
-              x: Math.random() * 800,
-              y: Math.random() * 600
-            };
-            nodes.push(targetNodeData);
-            nodeMap.set(targetId, targetNodeData);
-          }
-
+        rs.forEach((rel: any) => {
+          const sourceId = rel.start.toString();
+          const targetId = rel.end.toString();
+          // Only include links where both nodes are in our node set
+          if (!nodeMap.has(sourceId) || !nodeMap.has(targetId)) return;
           links.push({
             source: sourceId,
             target: targetId,
-            type: relationship.type,
-            properties: relationship.properties
+            type: rel.type,
+            properties: rel.properties
           });
-        }
-      });
+        });
+      }
 
       return NextResponse.json({
         nodes,
         links,
         totalNodes: nodes.length,
-        totalLinks: links.length
+        totalLinks: links.length,
+        start: nameParam,
+        depth
       });
 
     } finally {
