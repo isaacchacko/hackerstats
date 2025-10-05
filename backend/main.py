@@ -70,11 +70,11 @@ def get_crawler_task(q_hacker, q_devpost, q_hackathon):
         }
 
     except Empty:
-        logError("Massive error: no hackers, devposts, or hackathons to process.")
+        # logError("Massive error: no hackers, devposts, or hackathons to process.")
         return {'error': NO_TASK}
 
 
-def crawler(label, q_todo, q_hacker, q_devpost, q_hackathon, visited):
+def crawler(label, q_todo, q_hacker, q_devpost, q_hackathon, visited, memory):
     driver = webdriver.Chrome(options=options)
     while True:
         task = get_crawler_task(q_hacker, q_devpost, q_hackathon)
@@ -83,7 +83,7 @@ def crawler(label, q_todo, q_hacker, q_devpost, q_hackathon, visited):
             if task['error'] == NULL_CMD: break
 
             if task['error'] == NO_TASK:
-                logError(f"{label} failed to retrieve a task.")
+                # logError(f"{label} failed to retrieve a task.")
                 continue
         
         with visited[task['folder']]['lock']:
@@ -95,14 +95,15 @@ def crawler(label, q_todo, q_hacker, q_devpost, q_hackathon, visited):
                 print(f'{label} adding "{task['name']}" to {task['folder']} (reference: "{task['from']['name']}" from {task['from']['folder']})')
                 driver.get(task['url'])
                 content = driver.page_source
-                with open(get_filepath(task), 'w') as f:
-                    f.write(content)
+                memory[task['name']] = content
         
 
                 visited[task['folder']]['local'].add(task['name'])
 
             # if not in the now visited (visited this loop)
             if task['name'] not in visited[task['folder']]['now']:
+                with open(get_filepath(task), 'r') as f:
+                    memory[task['name']] = f.read()
                 q_todo.put(task)
                 visited[task['folder']]['now'].add(task['name'])
 
@@ -125,9 +126,9 @@ def get_parser_task(q_todo):
         return content
 
     except Empty:
+        # logError("Massive error: no hackers, devposts, or hackathons to parse.")
         return {'error': NO_TASK}
 
-    logError("Massive error: no hackers, devposts, or hackathons to parse.")
 
 def parse_hacker(task, content, q_hacker, q_devpost, q_hackathon):
 
@@ -191,7 +192,6 @@ def generate_connection(session, hacker, devpost):
         CREATE (h)-[:CONTRIBUTED_TO]->(d)""",
             hacker=hacker,
             devpost=devpost)
-    print(f'attempting to gen between {hacker} and {devpost}: result {result.single()}')
 
 def parse_devpost(task, content, q_hacker, q_devpost, q_hackathon):
 
@@ -262,7 +262,7 @@ def parse_devpost(task, content, q_hacker, q_devpost, q_hackathon):
 
     task['done_callback']()
 
-def parser(label, q_todo, q_hacker, q_devpost, q_hackathon):
+def parser(label, q_todo, q_hacker, q_devpost, q_hackathon, memory):
     while True:
         task = get_parser_task(q_todo)
         
@@ -273,9 +273,8 @@ def parser(label, q_todo, q_hacker, q_devpost, q_hackathon):
                 continue
 
         print(f'{label} parsing "{task['name']}" from {task['folder']}')
-        with open(get_filepath(task), 'r') as f:
-            content = f.read()
-        
+        content = memory[task['name']]
+        del memory[task['name']] 
         if task['folder'] == 'hackers':
             parse_hacker(task, content, q_hacker, q_devpost, q_hackathon)
 
@@ -312,6 +311,7 @@ if __name__ == "__main__":
     q_devpost = Queue()
     q_hackathon = Queue()
     
+    memory = {}
     visited = {
         'hackers':  {
             'lock': threading.Lock(),
@@ -331,17 +331,17 @@ if __name__ == "__main__":
     }
 
     try:
-        CRAWLER_COUNT = 4
-        PARSER_COUNT = 1
+        CRAWLER_COUNT = 3
+        PARSER_COUNT = 4
         crawlers = []
         for i in range(CRAWLER_COUNT):
-            t = threading.Thread(target=crawler, args=(f"Crawler {i}", q_todo, q_hacker, q_devpost, q_hackathon, visited))
+            t = threading.Thread(target=crawler, args=(f"Crawler {i}", q_todo, q_hacker, q_devpost, q_hackathon, visited, memory))
             t.start()
             crawlers.append(t)
 
         parsers = []
         for i in range(PARSER_COUNT):
-            t = threading.Thread(target=parser, args=(f"Parser {i}", q_todo, q_hacker, q_devpost, q_hackathon))
+            t = threading.Thread(target=parser, args=(f"Parser {i}", q_todo, q_hacker, q_devpost, q_hackathon, memory))
             t.start()
             parsers.append(t)
 
