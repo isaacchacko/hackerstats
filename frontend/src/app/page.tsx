@@ -209,7 +209,7 @@ export default function Home() {
             >
               Discover the hidden connections in the hackathon universe. 
               Visualize projects, track hacker journeys, and unlock insights 
-              from the world's largest hackathon database.
+              from the world&#39;s largest hackathon database.
             </motion.p>
 
             <motion.div 

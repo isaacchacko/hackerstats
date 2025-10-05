@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import GraphVisualization from '@/components/GraphVisualization';
+import { graph } from 'neo4j-driver';
 
 interface GraphData {
   nodes: any[];
@@ -215,7 +216,7 @@ export default function GraphPage() {
             {/* Graph Area */}
             <div className="flex-1">
               <GraphVisualization
-                data={graphData}
+                data={graphData || undefined}
                 onNodeClick={handleNodeClick}
                 onLinkClick={handleLinkClick}
                 highlightQuery={search}

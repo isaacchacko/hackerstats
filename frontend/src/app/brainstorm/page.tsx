@@ -184,7 +184,7 @@ export default function BrainstormPage() {
                         {!isVeryCompetitive && (
                           <span className="ml-2 inline-flex items-center gap-1 text-sky-300">
                             <span>💡</span>
-                            <span>There haven't been many winners with this project idea. You could be the first!</span>
+                          <span>There haven&#39;t been many winners with this project idea. You could be the first!</span>
                           </span>
                         )}
                       </div>

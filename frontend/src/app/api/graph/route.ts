@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
         summary: {
           resultAvailableAfter: result.summary.resultAvailableAfter,
           resultConsumedAfter: result.summary.resultConsumedAfter,
-          statementType: result.summary.statementType,
+          // statementType: result.summary.statementType,
           counters: result.summary.counters
         }
       });
