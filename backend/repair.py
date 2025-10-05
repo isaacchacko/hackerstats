@@ -4,7 +4,7 @@ from neo4j import GraphDatabase
 
 # for webscraping
 from selenium.webdriver.chrome.options import Options
-from selenium import webdriver
+from selenium.webdriver import Chrome as SeleniumChrome
 from bs4 import BeautifulSoup
 import re
 import threading
@@ -41,12 +41,9 @@ def get_all_devposts():
 def create_browser():
     """Create a new browser instance for thread-safe scraping"""
     options = Options()
+    options.binary_location ="/usr/bin/google-chrome"
     options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
-    return webdriver.Chrome(options=options)
+    return SeleniumChrome(options=options)
 
 def scrape_devpost_with_browser(devpost_id):
     """Scrape a single devpost with its own browser instance"""
