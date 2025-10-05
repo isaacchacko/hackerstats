@@ -190,7 +190,7 @@ def parse_hacker(task, content, q_hacker, q_devpost, q_hackathon):
 def generate_connection(session, hacker, devpost):
     result = session.run("""
         MATCH (h:Hacker {name: $hacker}), (d:Devpost {name: $devpost})
-        CREATE (h)-[:CONTRIBUTED_TO]->(d)""",
+        MERGE (h)-[:CONTRIBUTED_TO]->(d)""",
             hacker=hacker,
             devpost=devpost)
 
