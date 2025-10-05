@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn } from 'child_process';
-import path from 'path';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,95 +12,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Path to the backend directory
-    const backendPath = path.join(process.cwd(), '..', 'backend');
-    
-    let command: string;
-    let args: string[] = [];
-
-    switch (action) {
-      case 'vectorize_project':
-        if (!projectId) {
-          return NextResponse.json(
-            { error: 'Project ID is required for vectorization' },
-            { status: 400 }
-          );
-        }
-        command = 'python';
-        args = ['vectorizer.py', projectId];
-        break;
-
-      case 'scale_test':
-        command = 'python';
-        args = ['scale_test.py'];
-        break;
-
-      case 'similarity_search':
-        if (!query) {
-          return NextResponse.json(
-            { error: 'Query is required for similarity search' },
-            { status: 400 }
-          );
-        }
-        command = 'python';
-        args = ['test_vectorizer.py', '--query', query];
-        break;
-
-      case 'repair_vectors':
-        command = 'python';
-        args = ['scale_test.py', '--repair'];
-        break;
-
-      default:
-        return NextResponse.json(
-          { error: 'Invalid action' },
-          { status: 400 }
-        );
-    }
-
-    // Execute the Python script
-    const result = await new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve) => {
-      const process = spawn(command, args, {
-        cwd: backendPath,
-        stdio: 'pipe'
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      process.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      process.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      process.on('close', (code) => {
-        resolve({
-          stdout,
-          stderr,
-          exitCode: code || 0
-        });
-      });
-    });
-
-    if (result.exitCode !== 0) {
+    const PY_BACKEND_URL = process.env.PY_BACKEND_URL;
+    if (!PY_BACKEND_URL) {
       return NextResponse.json(
-        { 
-          error: 'Vectorizer process failed',
-          details: result.stderr,
-          stdout: result.stdout
-        },
+        { error: 'PY_BACKEND_URL is not configured' },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      output: result.stdout,
-      action
+    const resp = await fetch(`${PY_BACKEND_URL}/api/vectorizer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, projectId, query })
     });
+
+    const text = await resp.text();
+    if (!resp.ok) {
+      return NextResponse.json(
+        { error: 'Vectorizer request failed', details: text },
+        { status: 502 }
+      );
+    }
+
+    try {
+      const json = JSON.parse(text);
+      return NextResponse.json(json);
+    } catch {
+      return NextResponse.json({ success: true, output: text, action });
+    }
 
   } catch (error) {
     console.error('Error executing vectorizer:', error);
@@ -118,72 +55,32 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action') || 'status';
 
-    // Path to the backend directory
-    const backendPath = path.join(process.cwd(), '..', 'backend');
-    
-    let command: string;
-    let args: string[] = [];
-
-    switch (action) {
-      case 'status':
-        command = 'python';
-        args = ['-c', 'import os; print("Vectorizer files exist:", os.path.exists("vectorizer.py"), os.path.exists("scale_test.py"))'];
-        break;
-
-      case 'list_projects':
-        command = 'python';
-        args = ['-c', 'import os, json; print(json.dumps([f for f in os.listdir(".") if f.endswith("_scraped.json")]))'];
-        break;
-
-      default:
-        return NextResponse.json(
-          { error: 'Invalid action' },
-          { status: 400 }
-        );
-    }
-
-    // Execute the Python script
-    const result = await new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve) => {
-      const process = spawn(command, args, {
-        cwd: backendPath,
-        stdio: 'pipe'
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      process.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      process.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      process.on('close', (code) => {
-        resolve({
-          stdout,
-          stderr,
-          exitCode: code || 0
-        });
-      });
-    });
-
-    if (result.exitCode !== 0) {
+    const PY_BACKEND_URL = process.env.PY_BACKEND_URL;
+    if (!PY_BACKEND_URL) {
       return NextResponse.json(
-        { 
-          error: 'Status check failed',
-          details: result.stderr
-        },
+        { error: 'PY_BACKEND_URL is not configured' },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      output: result.stdout,
-      action
+    const resp = await fetch(`${PY_BACKEND_URL}/api/vectorizer?action=${encodeURIComponent(action)}`, {
+      method: 'GET'
     });
+
+    const text = await resp.text();
+    if (!resp.ok) {
+      return NextResponse.json(
+        { error: 'Vectorizer status failed', details: text },
+        { status: 502 }
+      );
+    }
+
+    try {
+      const json = JSON.parse(text);
+      return NextResponse.json(json);
+    } catch {
+      return NextResponse.json({ success: true, output: text, action });
+    }
 
   } catch (error) {
     console.error('Error checking vectorizer status:', error);

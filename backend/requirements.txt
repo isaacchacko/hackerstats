@@ -13,3 +13,8 @@ typing_extensions==4.15.0
 urllib3==2.5.0
 websocket-client==1.8.0
 wsproto==1.2.0
+fastapi==0.112.2
+uvicorn==0.30.6
+numpy==2.1.1
+scikit-learn==1.5.1
+sentence-transformers==3.0.1

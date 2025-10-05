@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn } from 'node:child_process';
-import path from 'path';
-import fs from 'node:fs';
 
-// Ensure this route runs on the Node.js runtime (not Edge) so child_process is available
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -19,51 +15,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const backendPath = path.join(process.cwd(), '..', 'backend');
+    const PY_BACKEND_URL = process.env.PY_BACKEND_URL;
+    if (!PY_BACKEND_URL) {
+      return NextResponse.json(
+        { error: 'PY_BACKEND_URL is not configured' },
+        { status: 500 }
+      );
+    }
 
-    // Prefer the backend venv's python if available
-    const venvPython = path.join(backendPath, 'venv', 'bin', 'python');
-    const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python';
-
-    const result = await new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve) => {
-      const child = spawn(pythonCmd, ['brainstorm.py', '--query', query, '--top_k', String(top_k)], {
-        cwd: backendPath,
-        stdio: 'pipe'
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      child.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      child.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      child.on('close', (code) => {
-        resolve({ stdout, stderr, exitCode: code ?? 0 });
-      });
+    const resp = await fetch(`${PY_BACKEND_URL}/api/brainstorm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, top_k })
     });
 
-    if (result.exitCode !== 0) {
+    if (!resp.ok) {
+      const text = await resp.text();
       return NextResponse.json(
-        { error: 'Brainstorm process failed', details: result.stderr || result.stdout },
-        { status: 500 }
+        { error: 'Brainstorm request failed', details: text },
+        { status: 502 }
       );
     }
 
-    // The script prints JSON on stdout
-    try {
-      const json = JSON.parse(result.stdout);
-      return NextResponse.json(json);
-    } catch (e) {
-      return NextResponse.json(
-        { error: 'Failed to parse brainstorm output', raw: result.stdout },
-        { status: 500 }
-      );
-    }
+    const json = await resp.json();
+    return NextResponse.json(json);
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to run brainstorm' },
