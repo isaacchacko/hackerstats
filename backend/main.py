@@ -6,15 +6,14 @@ from selenium.webdriver.chrome.options import Options
 import urllib.parse
 import sys
 import os
+from dotenv import load_dotenv
+from neo4j import GraphDatabase
+import pickle
 
 NULL_CMD = -1
 NO_TASK = -2
 NO_FROM = {'name': 'Unknown', 'folder': 'Unknown'}
 TIMEOUT = 0.1
-
-options = Options()
-options.add_argument("--headless")
-options.add_argument("--disable-gpu")
 
 logError = lambda msg: print(msg, file=sys.stderr)
 def get_filepath(task): return f'./{task['folder']}/{task['name']}.html'
@@ -164,17 +163,35 @@ def parse_hacker(task, content, q_hacker, q_devpost, q_hackathon):
     }
 
     # insert some db write
+    with driver.session() as session:
+        session.run("MERGE (:Hacker {name: $name, displayName: $displayName, socialURLs: $socialURLs})", 
+            name=task['name'],
+            displayName=displayName,
+            socialURLs=socialURLs)
+
+        for devpost in devposts:
+            generate_connection(session, task['name'], devpost)
+
 
     for devpost in devposts:
         q_devpost.put({
             'name': devpost,
             'from': {
                 'name': task['name'],
-                'folder': task['folder']
+                'folder': task['folder'],
+                'info': info
             }
         })
     
     task['done_callback']()
+
+def generate_connection(session, hacker, devpost):
+    result = session.run("""
+        MATCH (h:Hacker {name: $hacker}), (d:Devpost {name: $devpost})
+        CREATE (h)-[:CONTRIBUTED_TO]->(d)""",
+            hacker=hacker,
+            devpost=devpost)
+    print(f'attempting to gen between {hacker} and {devpost}: result {result.single()}')
 
 def parse_devpost(task, content, q_hacker, q_devpost, q_hackathon):
 
@@ -226,7 +243,15 @@ def parse_devpost(task, content, q_hacker, q_devpost, q_hackathon):
     }
 
     # again insert some db write
-       
+    with driver.session() as session:
+        session.run("MERGE (:Devpost {name: $name, hackathonName: $hackathonName, hackathonDisplayName: $hackathonDisplayName})", 
+            name=task['name'],
+            hackathonName=hackathonName,
+            hackathonDisplayName=hackathonDisplayName)
+
+        for hacker in hackers:
+            generate_connection(session, hacker, task['name'])
+     
     for hacker in hackers:
         q_hacker.put({
             'name': hacker,
@@ -271,8 +296,17 @@ def purge_all(folders):
     
 if __name__ == "__main__":
 
-    purge_all(['./hackers/', './devposts/', './hackathons/'])
+    options = Options()
+    options.add_argument("--headless")
 
+    load_dotenv()
+
+    uri = os.getenv("NEO4J_URI")
+    username = os.getenv("NEO4J_USERNAME")
+    password = os.getenv("NEO4J_PASSWORD")
+
+    driver = GraphDatabase.driver(uri, auth=(username, password))
+    
     q_todo = Queue()
     q_hacker = Queue()
     q_devpost = Queue()
@@ -296,38 +330,42 @@ if __name__ == "__main__":
         }
     }
 
-    CRAWLER_COUNT = 4
-    PARSER_COUNT = 1
-    crawlers = []
-    for i in range(CRAWLER_COUNT):
-        t = threading.Thread(target=crawler, args=(f"Crawler {i}", q_todo, q_hacker, q_devpost, q_hackathon, visited))
-        t.start()
-        crawlers.append(t)
+    try:
+        CRAWLER_COUNT = 4
+        PARSER_COUNT = 1
+        crawlers = []
+        for i in range(CRAWLER_COUNT):
+            t = threading.Thread(target=crawler, args=(f"Crawler {i}", q_todo, q_hacker, q_devpost, q_hackathon, visited))
+            t.start()
+            crawlers.append(t)
 
-    parsers = []
-    for i in range(PARSER_COUNT):
-        t = threading.Thread(target=parser, args=(f"Parser {i}", q_todo, q_hacker, q_devpost, q_hackathon))
-        t.start()
-        parsers.append(t)
+        parsers = []
+        for i in range(PARSER_COUNT):
+            t = threading.Thread(target=parser, args=(f"Parser {i}", q_todo, q_hacker, q_devpost, q_hackathon))
+            t.start()
+            parsers.append(t)
 
-    # Main thread can inject URLs at will:
-    # url_queue.put("https://hackgt-12.devpost.com/project-gallery")
-    q_hacker.put({'name': 'isaacchacko'})
-    
-    # Wait for all URLs to be processed
-    q_todo.join()
-    q_hacker.join()
-    q_devpost.join()
-    q_hackathon.join()
-    
-    # Stop the workers by sending None (sentinel)
-    # q_hacker.put(NULL_CMD)
-    # q_hacker.put(NULL_CMD)
+        q_hacker.put({'name': 'isaacchacko'})
+        
+        # Wait for all URLs to be processed
+        q_todo.join()
+        q_hacker.join()
+        q_devpost.join()
+        q_hackathon.join()
 
-    for t in crawlers:
-        t.join()
+        for t in crawlers:
+            t.join()
 
-    for t in parsers:
-        t.join()
+        for t in parsers:
+            t.join()
 
-    print("All workers stopped.")
+        print("All workers stopped.")
+
+    except OSError:
+        purge_all(['./devposts'])
+        with open('visited.pkl',  'wb') as f:
+            pickle.dump(visited, f)
+
+    except KeyboardInterrupt:
+        with open('visited.pkl',  'wb') as f:
+            pickle.dump(visited, f)
