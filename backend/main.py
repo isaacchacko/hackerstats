@@ -83,7 +83,7 @@ def crawler(label, q_todo, q_hacker, q_devpost, q_hackathon, visited, memory):
             if task['error'] == NULL_CMD: break
 
             if task['error'] == NO_TASK:
-                # logError(f"{label} failed to retrieve a task.")
+                logError(f"{label} failed to retrieve a task.")
                 continue
         
         with visited[task['folder']]['lock']:
@@ -102,8 +102,9 @@ def crawler(label, q_todo, q_hacker, q_devpost, q_hackathon, visited, memory):
 
             # if not in the now visited (visited this loop)
             if task['name'] not in visited[task['folder']]['now']:
-                with open(get_filepath(task), 'r') as f:
-                    memory[task['name']] = f.read()
+                if task['name'] not in memory:
+                    with open(get_filepath(task), 'r') as f:
+                        memory[task['name']] = f.read()
                 q_todo.put(task)
                 visited[task['folder']]['now'].add(task['name'])
 
@@ -362,10 +363,13 @@ if __name__ == "__main__":
         print("All workers stopped.")
 
     except OSError:
-        purge_all(['./devposts'])
+        for i in visited:
+            del visited[i]['lock']
         with open('visited.pkl',  'wb') as f:
             pickle.dump(visited, f)
 
     except KeyboardInterrupt:
+        for i in visited:
+            del visited[i]['lock']
         with open('visited.pkl',  'wb') as f:
             pickle.dump(visited, f)
